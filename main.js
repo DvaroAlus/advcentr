@@ -47,6 +47,37 @@ $$('.nav__link').forEach(l=>l.addEventListener('click',()=>{
   document.body.style.overflow='';
 }));
 
+// Smart anchor scroll: center short sections, top-align tall ones
+function smoothScrollToSection(id){
+  const target=document.getElementById(id);
+  if(!target) return false;
+  const navH=nav?.offsetHeight||80;
+  const sectionTop=target.getBoundingClientRect().top+window.scrollY;
+  const sectionH=target.offsetHeight;
+  const avail=window.innerHeight-navH;
+  let y;
+  if(sectionH<=avail){
+    y=sectionTop-navH-(avail-sectionH)/2;
+  } else {
+    y=sectionTop-navH;
+  }
+  const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  window.scrollTo({top:Math.max(0,y), behavior:reduced?'auto':'smooth'});
+  return true;
+}
+document.addEventListener('click',e=>{
+  const link=e.target.closest('a[href^="#"]');
+  if(!link) return;
+  const href=link.getAttribute('href')||'';
+  if(href===''||href==='#') return;
+  let id;
+  try { id=decodeURIComponent(href.slice(1)); } catch { id=href.slice(1); }
+  if(!document.getElementById(id)) return;
+  e.preventDefault();
+  smoothScrollToSection(id);
+  if(history.replaceState) history.replaceState(null,'',href);
+});
+
 // Reveal on scroll
 const obs = new IntersectionObserver((entries)=>{
   entries.forEach((entry,i)=>{
@@ -218,12 +249,11 @@ document.addEventListener('keydown',e=>{
 modalOrder?.addEventListener('click',()=>{
   setService(modalCurrentService);
   closeModal();
-  const target=document.getElementById('заявка');
-  if(!target) return;
   const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   setTimeout(()=>{
-    target.scrollIntoView({behavior:reduced?'auto':'smooth', block:'start'});
-    setTimeout(()=>$('#c-name')?.focus({preventScroll:true}), reduced?0:600);
+    if(smoothScrollToSection('заявка')){
+      setTimeout(()=>$('#c-name')?.focus({preventScroll:true}), reduced?0:600);
+    }
   },260);
 });
 
@@ -280,12 +310,17 @@ if(ph){ph.addEventListener('input',function(){
 // Active nav link
 const sections=$$('section[id]');
 const navEls=$$('.nav__link');
+function hrefMatchesId(href,id){
+  if(!href) return false;
+  const raw=href.startsWith('#')?href.slice(1):href;
+  try{ return raw===id||decodeURIComponent(raw)===id; }catch{ return raw===id; }
+}
 const secObs=new IntersectionObserver((entries)=>{
   entries.forEach(e=>{
     if(e.isIntersecting){
       navEls.forEach(l=>l.classList.remove('active'));
-      navEls.find(l=>l.getAttribute('href')==='#'+e.target.id)?.classList.add('active');
+      navEls.find(l=>hrefMatchesId(l.getAttribute('href'),e.target.id))?.classList.add('active');
     }
   });
-},{threshold:0.4});
+},{rootMargin:'-30% 0px -60% 0px',threshold:0});
 sections.forEach(s=>secObs.observe(s));
